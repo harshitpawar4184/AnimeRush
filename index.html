@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AnimeRush – Best Site to Download Anime in Hindi Dubbed & Dual Audio</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- TOP HEADER & INTERACTIVE NAVIGATION BAR -->
+  <header class="site-header">
+    <div class="nav-container">
+      <div class="brand-logo" onclick="resetAllFilters()">
+        🔥 AnimeRush
+      
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-btn" onclick="resetAllFilters()">Home</button>
+
+        <!-- 1. All Anime Shows List (A-Z) -->
+        <button class="nav-btn" onclick="toggleAzDrawer()">All Anime Shows List (A-Z) ▾</button>
+
+        <!-- 2. Languages Dropdown -->
+        <div class="nav-item">
+          <button class="nav-btn" onclick="toggleDropdown('dropdown-langs', event)">Languages ▾</button>
+          <div class="dropdown-panel" id="dropdown-langs">
+            <button class="drop-option" onclick="filterByLanguage('ALL', 'All Languages')">🌍 All Languages</button>
+            <button class="drop-option" onclick="filterByLanguage('HI', 'Hindi Dubbed')">🇮🇳 Hindi Dubbed (HI)</button>
+            <button class="drop-option" onclick="filterByLanguage('EN', 'English Dubbed')">🇬🇧 English Dubbed (EN)</button>
+            <button class="drop-option" onclick="filterByLanguage('JP', 'Japanese Original')">🇯🇵 Japanese Subbed (JP)</button>
+            <button class="drop-option" onclick="filterByLanguage('TAM', 'Tamil Dubbed')">🇮🇳 Tamil Dubbed (TAM)</button>
+            <button class="drop-option" onclick="filterByLanguage('TEL', 'Telugu Dubbed')">🇮🇳 Telugu Dubbed (TEL)</button>
+          </div>
+        </div>
+
+        <!-- 3. Quality Dropdown -->
+        <div class="nav-item">
+          <button class="nav-btn" onclick="toggleDropdown('dropdown-quality', event)">Quality ▾</button>
+          <div class="dropdown-panel" id="dropdown-quality">
+            <button class="drop-option" onclick="filterByQuality('1080p', '1080p Full HD')">🟢 1080p Full HD (10bit HEVC)</button>
+            <button class="drop-option" onclick="filterByQuality('720p', '720p HD')">🔵 720p HD HEVC</button>
+            <button class="drop-option" onclick="filterByQuality('480p', '480p SD')">🔴 480p SD x264</button>
+            <button class="drop-option" onclick="filterByQuality('BluRay', 'BluRay Uncensored')">💿 BluRay Uncensored</button>
+            <button class="drop-option" onclick="filterByQuality('ZIP', 'Full Season .ZIP Packs')">📦 Full Season .ZIP Packs</button>
+          </div>
+        </div>
+
+        <!-- 4. Genres Mega Dropdown -->
+        <div class="nav-item">
+          <button class="nav-btn" onclick="toggleDropdown('dropdown-genres', event)">Genres ▾</button>
+          <div class="dropdown-panel mega-genres" id="dropdown-genres"></div>
+        </div>
+
+        <!-- 5. NEW: Jikan API Official Anime Trailers Page -->
+        <button class="nav-btn" style="border-color:#f59e0b; color:#fde047;" onclick="openTrailersPage()">
+          🎬 Anime Trailers
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- GLOBAL API SEARCH BAR & TELEGRAM CTA -->
+  <div class="top-utility-bar">
+    <div class="utility-inner">
+      <div class="global-search-wrap">
+        <input
+          type="text"
+          id="global-search-input"
+          placeholder="Search ANY Global Anime via API (e.g. One Piece, Naruto, Bleach)..."
+          onkeydown="if(event.key==='Enter') runGlobalSearch()"
+        />
+        <button class="btn-primary" onclick="runGlobalSearch()">🔍 Global Search</button>
+      </div>
+
+      <div>
+        <span style="font-size:0.82rem; color:var(--text-muted);">Instant Episode Updates:</span>
+        <a href="https://t.me/" target="_blank" class="tg-pill">✈️ JOIN TELEGRAM</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- A-Z ALPHABETICAL DIRECTORY DRAWER -->
+  <section class="az-drawer" id="az-drawer">
+    <div class="az-box">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <strong style="color:#38bdf8;">🔤 All Anime Shows List (A–Z Directory)</strong>
+        <button class="btn-primary" style="background:#334155;" onclick="toggleAzDrawer()">Close ✕</button>
+      </div>
+      <div class="az-letters" id="az-letters-bar"></div>
+    </div>
+  </section>
+
+  <!-- ACTIVE FILTER BANNER -->
+  <section class="filter-banner" id="filter-banner">
+    <div class="filter-banner-inner">
+      <span id="filter-banner-text">Active Filter</span>
+      <button class="btn-primary" style="background:#ef4444; padding:5px 12px;" onclick="resetAllFilters()">Clear Filter ✕</button>
+    </div>
+  </section>
+
+  <!-- VIEW 1: MAIN 3-COLUMN GRID + RIGHT SIDEBAR -->
+  <main class="main-layout" id="home-view">
+    <section>
+      <div class="poster-grid" id="anime-grid"></div>
+    </section>
+
+    <aside class="sidebar">
+      <div class="widget">
+        <div class="widget-title">About 
+          AnimeRush</div>
+        <p style="font-size:0.83rem; color:var(--text-muted);">
+          Welcome to <strong>AnimeRush</strong> — India's fastest website for Hindi dubbed anime, dual audio, Google Drive links, and English sub downloads in 1080p, 720p, and 480p 10bit HEVC.
+        </p>
+      </div>
+
+      <div class="widget">
+        <div class="widget-title">Recent Posts</div>
+        <div id="recent-posts-list"></div>
+      </div>
+
+      <div class="widget">
+        <div class="widget-title">Categories</div>
+        <div class="cat-cloud" id="sidebar-categories"></div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- VIEW 2: SEO STORY POST PAGE + JIKAN OFFICIAL TRAILER -->
+  <section class="sub-view" id="story-view">
+    <div class="content-card">
+      <button class="back-btn" onclick="showHomeView()">← Back to All Anime</button>
+
+      <div class="post-hero">
+        <img id="story-poster" src="" alt="Poster" referrerpolicy="no-referrer" />
+        <div>
+          <h1 id="story-title" style="font-size:1.35rem; margin-bottom:8px;">Anime Title</h1>
+          <p id="story-anilist-ref" style="font-size:0.82rem; color:#38bdf8; margin-bottom:14px;">Official Series Reference</p>
+          <p style="font-size:0.86rem; color:var(--text-muted); margin-bottom:18px;">
+            Audio: <strong>Hindi, English, Japanese [Multi-Audio]</strong><br />
+            Quality: <strong>480p, 720p & 1080p HD WEB-DL | 10bit HEVC + Google Drive</strong>
+          </p>
+          <button class="btn-primary" style="background:#16a34a; padding:12px 20px; font-size:0.95rem;" onclick="openLinksVault()">
+            ⚡ Go to Download Links, Google Drive & .ZIP Pack →
+          </button>
+        </div>
+      </div>
+
+      <!-- OFFICIAL JIKAN ANIME TRAILER PLAYER -->
+      <div class="seo-section" style="border-left-color:#ef4444;">
+        <h3>🎬 Official Anime Trailer (Powered by AnimeRush)</h3>
+        <div id="story-trailer-box" style="margin-top:10px;"></div>
+      </div>
+
+      <div class="seo-section">
+        <h3>📖 Detailed Story & Plot</h3>
+        <p id="story-plot"></p>
+      </div>
+
+      <div class="seo-section">
+        <h3>🔥 Season Highlights & Key Moments (Hinglish Review)</h3>
+        <p id="story-hinglish"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- VIEW 3: AnimeRush LINKS VAULT (GOOGLE DRIVE + ZIP + EPISODE ACCORDIONS) -->
+  <section class="sub-view" id="vault-view">
+    <div class="content-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:16px;">
+        <button class="back-btn" style="margin:0;" onclick="openStoryPage(activeAnimeItem.id)">← Back to Story & Trailer</button>
+        <button class="back-btn" style="margin:0;" onclick="showHomeView()">🏠 AnimeRush Home</button>
+      </div>
+
+      <h1 id="vault-heading" style="font-size:1.5rem; margin-bottom:4px;">Anime – Download</h1>
+      <p id="vault-submeta" style="font-size:0.82rem; color:#38bdf8; margin-bottom:20px;"></p>
+
+      <!-- DYNAMIC FULL SEASON .ZIP DOWNLOAD BOX -->
+      <div class="zip-pack-box" id="vault-zip-box"></div>
+
+      <!-- EPISODE ACCORDIONS -->
+      <div id="vault-episodes-list"></div>
+    </div>
+  </section>
+
+  <!-- VIEW 4: JIKAN API ALL ANIME TRAILERS PAGE -->
+  <section class="sub-view" id="trailers-view" style="max-width:1200px;">
+    <div class="content-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:18px;">
+        <div>
+          <h1 style="font-size:1.45rem; color:#fde047;">🎬 Official Anime Trailers Hub (AnimeRush)</h1>
+          <p style="font-size:0.84rem; color:var(--text-muted);">Watch official trailers for trending and searched anime, then jump straight to download links.</p>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="trailer-search-input" placeholder="Search trailer (e.g. Demon Slayer, Jujutsu Kaisen)..." style="background:var(--bg-input); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px;" onkeydown="if(event.key==='Enter') searchJikanTrailersPage()" />
+          <button class="btn-primary" onclick="searchJikanTrailersPage()">Search Trailers</button>
+          <button class="back-btn" style="margin:0;" onclick="showHomeView()">← Back Home</button>
+        </div>
+      </div>
+
+      <div id="jikan-trailers-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:18px;"></div>
+    </div>
+  </section>
+
+  <!-- TWIN CHIBI MAIDS REDIRECTING MODAL -->
+  <div class="redirect-modal" id="redirect-modal">
+    <div class="chibi-maids">
+      <span style="font-size:3.6rem;">👧🌸</span>
+      <span style="font-size:3.6rem;">👧💎</span>
+    </div>
+    <h3 id="redirect-status-text" style="margin-top:14px; color:#fff;">Redirecting...</h3>
+  </div>
+
+  <!-- STICKY BOTTOM TELEGRAM BAR & THEME BUTTON -->
+  <div class="sticky-telegram">
+    <span>Join our Telegram for latest updates!</span>
+    <a href="https://t.me/" target="_blank" class="tg-pill">Join ✈️</a>
+  </div>
+
+  <button class="theme-fab" onclick="toggleThemeMode()" title="Toggle Light/Dark Mode">🌙</button>
+
+  <footer>
+    <strong>DISCLAIMER:</strong> AnimeRush does not host any files on its servers. All files or contents are hosted on third-party websites. We just index those links which are already available on the internet.<br /><br />
+    Copyright © 2026 AnimeRush | All Rights Reserved
+  </footer>
+
+  <script src="js/data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
