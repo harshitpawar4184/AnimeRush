@@ -24,6 +24,7 @@
           type="text"
           id="admin-search-input"
           placeholder="Enter AniList ID (e.g. 171018) or Title (e.g. Solo Leveling, One Piece)..."
+          onkeydown="if(event.key==='Enter') adminAutoFetch()"
           style="flex:1; background:var(--bg-input); border:1px solid var(--border); color:#fff; padding:10px 14px; border-radius:7px;"
         />
         <button class="btn-primary" onclick="adminAutoFetch()">⚡ Auto-Fill Details</button>
@@ -76,7 +77,7 @@
         </div>
       </div>
 
-      <<!-- GOOGLE DRIVE & DIRECT ANIME FILE UPLOAD BOX -->
+      <!-- GOOGLE DRIVE & DIRECT ANIME FILE UPLOAD BOX -->
       <div style="background:var(--bg-input); border:1px solid #22c55e; border-radius:8px; padding:12px; margin-bottom:12px;">
         <h4 style="color:#4ade80; font-size:0.84rem; margin-bottom:8px;">🟢 GOOGLE DRIVE & DIRECT ANIME FILE UPLOAD</h4>
 
@@ -369,7 +370,7 @@
       await renderAdminList();
     }
 
-    function deleteAllCustomAnime() {
+    async function deleteAllCustomAnime() {
       if (!confirm('Clear all custom uploaded anime from Admin storage?')) return;
       await saveAdminDatabase([]);
       await renderAdminList();
