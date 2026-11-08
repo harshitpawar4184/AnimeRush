@@ -120,8 +120,8 @@ async function fetchJikanTrailerForAnime(animeTitle) {
 async function fetchJikanTrailersList(searchQuery = '') {
   try {
     const endpoint = searchQuery
-      ? `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(searchQuery)}&limit=12`
-      : `https://api.jikan.moe/v4/top/anime?filter=airing&limit=12`;
+      ? `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(searchQuery)}&limit=6`
+      : `https://api.jikan.moe/v4/top/anime?filter=airing&limit=6`;
 
     const res = await fetch(endpoint);
     const json = await res.json();

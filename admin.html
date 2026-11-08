@@ -377,14 +377,27 @@
     }
 
     function clearAdminForm() {
+      selectedLocalFileName = '';
       document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => el.value = '');
       document.getElementById('adm-ep').value = '01';
       document.getElementById('adm-ep-title').value = 'Episode 1';
+      document.getElementById('local-anime-file').value = '';
     }
     function extractGoogleDriveId(url) {
       if (!url) return null;
-      const match = url.match(/(?:\/d\/|\/folders\/|[?&]id=)([a-zA-Z0-9_-]{15,})/);
-      return match ? match[1] : null;
+      const value = String(url).trim();
+
+      try {
+        const parsed = new URL(value);
+        const directId = parsed.searchParams.get('id');
+        if (directId) return directId;
+
+        const pathMatch = parsed.pathname.match(/\/(?:d|folders)\/([A-Za-z0-9_-]+)/);
+        if (pathMatch) return pathMatch[1];
+      } catch (err) {}
+
+      const fallbackMatch = value.match(/(?:\/d\/|\/folders\/|[?&]id=)([A-Za-z0-9_-]{10,})/);
+      return fallbackMatch ? fallbackMatch[1] : null;
     }
 
     function autoGenerateQualitiesFromSingleDriveLink(rawUrl) {

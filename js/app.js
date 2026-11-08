@@ -411,9 +411,23 @@ function renderServerButtons(serverLabel, customLinks = {}) {
   const link720 = (customLinks.p720 && !customLinks.p720.startsWith('#')) ? customLinks.p720 : `${masterLink}&quality=720p`;
   const link1080 = (customLinks.p1080 && !customLinks.p1080.startsWith('#')) ? customLinks.p1080 : `${masterLink}&quality=1080p`;
 
-  const driveMatch = masterLink.match(/(?:\/d\/|[?&]id=)([a-zA-Z0-9_-]{15,})/);
-  const streamBtn = driveMatch
-    ? `<button class="dl-btn purple" onclick="openDriveQualityPlayer('${driveMatch[1]}')">▶️ Watch / Switch Quality (480p-1080p)</button>`
+  let driveId = null;
+  try {
+    const parsed = new URL(masterLink);
+    driveId = parsed.searchParams.get('id') || null;
+    if (!driveId) {
+      const pathMatch = parsed.pathname.match(/\/(?:d|folders)\/([A-Za-z0-9_-]+)/);
+      if (pathMatch) driveId = pathMatch[1];
+    }
+  } catch (err) {}
+
+  if (!driveId) {
+    const fallbackMatch = masterLink.match(/(?:\/d\/|\/folders\/|[?&]id=)([A-Za-z0-9_-]{10,})/);
+    driveId = fallbackMatch ? fallbackMatch[1] : null;
+  }
+
+  const streamBtn = driveId
+    ? `<button class="dl-btn purple" onclick="openDriveQualityPlayer('${driveId}')">▶️ Watch / Switch Quality (480p-1080p)</button>`
     : '';
 
   return `
