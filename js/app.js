@@ -1,217 +1,289 @@
 // ==========================================================
-// SMART DOWNLOAD VAULT & MOBILE DIRECT DOWNLOAD HANDLER
+// AnimeRush - COMPACT & CLEAN MAIN CONTROLLER (js/app.js)
 // ==========================================================
 
-// 1. Checks if a specific link is actually added and valid
-function isLinkValid(url) {
-  if (!url) return false;
-  const clean = String(url).trim();
-  return (
-    clean !== '' &&
-    clean !== '#' &&
-    clean !== 'https://drive.google.com/' &&
-    !clean.startsWith('localfile://')
-  );
-}
+let currentAnimeList = [];
+let activeAnimeItem = null;
+let selectedLetter = 'ALL';
 
-// 2. Renders an ACTIVE glowing button if a link exists, or a disabled badge if empty
-function renderQualityBtn(url, qualityLabel, activeBgHex) {
-  if (isLinkValid(url)) {
-    const safeUrl = String(url).replace(/'/g, "\\'");
-    return `
-      <button onclick="triggerChibiRedirect('${safeUrl}', '${qualityLabel}')" 
-        style="background:${activeBgHex}; color:#fff; border:1px solid rgba(255,255,255,0.28); padding:9px 14px; border-radius:8px; font-weight:700; font-size:0.82rem; cursor:pointer; display:inline-flex; align-items:center; gap:7px; box-shadow:0 4px 12px rgba(0,0,0,0.35);">
-        <span>✅ ${qualityLabel}</span>
-        <span style="background:rgba(0,0,0,0.4); padding:2px 6px; border-radius:4px; font-size:0.68rem; color:#86efac; letter-spacing:0.5px;">ACTIVE</span>
-      </button>
-    `;
-  } else {
-    return `
-      <button disabled 
-        style="background:rgba(30,41,59,0.45); color:#64748b; border:1px dashed #334155; padding:9px 14px; border-radius:8px; font-weight:600; font-size:0.8rem; cursor:not-allowed; display:inline-flex; align-items:center; gap:6px; opacity:0.55;">
-        <span>🚫 ${qualityLabel} (Not Added)</span>
-      </button>
-    `;
+document.addEventListener('DOMContentLoaded', () => {
+  currentAnimeList = getFullAnimeList();
+  renderNavigationMenus();
+  renderSidebarWidgets();
+  renderAnimeGrid(currentAnimeList);
+  if (typeof hydrateDefaultPosters === 'function') hydrateDefaultPosters();
+
+  if (typeof TELEGRAM_CHANNEL_URL !== 'undefined' && TELEGRAM_CHANNEL_URL) {
+    document.querySelectorAll('a[href*="t.me"]').forEach(a => a.href = TELEGRAM_CHANNEL_URL);
+  }
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.nav-item')) closeAllDropdowns();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') window.location.href = 'admin.html';
+  });
+});
+
+// 1. Top Menus & Sidebar
+function renderNavigationMenus() {
+  const az = document.getElementById('az-letters-bar');
+  if (az) {
+    const letters = ['ALL', '#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'];
+    az.innerHTML = letters.map(l => `<button class="az-btn ${l === selectedLetter ? 'active' : ''}" onclick="filterByLetter('${l}')">${l}</button>`).join('');
+  }
+  const gen = document.getElementById('dropdown-genres');
+  if (gen) {
+    gen.innerHTML = GENRE_LIST.map(g => `<button class="drop-option" onclick="filterByGenre('${g}')"><span>${g}</span><span style="color:#38bdf8;font-size:0.75rem;">View</span></button>`).join('');
   }
 }
 
-// 3. Direct Mobile & PC Download Trigger (Bypasses Android Drive App Hijack)
-function triggerChibiRedirect(url, label) {
-  if (!isLinkValid(url)) {
-    alert('Link not added for this quality yet!');
+function renderSidebarWidgets() {
+  const recentEl = document.getElementById('recent-posts-list');
+  if (recentEl) {
+    recentEl.innerHTML = getFullAnimeList().slice(0, 5).map(item => {
+      const count = item.episodes?.length || 0;
+      const badge = count > 0 ? `<strong style="color:#22c55e;">| EP-${String(count).padStart(2, '0')} Added</strong>` : `<span style="color:#94a3b8;">| Not Uploaded</span>`;
+      return `<div class="recent-item" onclick="openStoryPage(${item.id})">${item.title} [Hindi-Eng-Jap] HD ${badge}</div>`;
+    }).join('');
+  }
+  const catEl = document.getElementById('sidebar-categories');
+  if (catEl) {
+    catEl.innerHTML = SIDEBAR_CATEGORIES.map(c => `<button class="cat-chip" onclick="filterByCategoryTag('${c}')">${c}</button>`).join('');
+  }
+}
+
+// 2. Main Anime Grid
+function renderAnimeGrid(list) {
+  const grid = document.getElementById('anime-grid');
+  if (!grid) return;
+  if (!list?.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;padding:40px;text-align:center;background:var(--bg-card);border-radius:12px;"><h3>⚠️ Anime Not Found</h3></div>`;
     return;
   }
 
-  let finalUrl = String(url).trim();
+  grid.innerHTML = list.map(item => {
+    const fallback = createSvgPoster(item.title, item.accent || '#1e3a8a', 'MULTI AUDIO');
+    const poster = (item.poster?.startsWith('http') && !item.poster.includes('...')) ? item.poster : fallback;
+    const badges = (item.langs || ['HI', 'EN', 'JP']).map(l => `<span class="lang-badge">${l}</span>`).join('');
+    return `
+      <article class="anime-card" onclick="openStoryPage(${item.id})">
+        <div class="card-badges">${item.isGlobalApi ? '<span class="lang-badge api">API</span>' : ''}${badges}</div>
+        <img data-anime-id="${item.id}" src="${poster}" alt="${item.title.replace(/"/g, '&quot;')}" loading="lazy" onerror="this.onerror=null;this.src='${fallback}';" />
+        <div class="card-overlay"><div class="card-title">${item.title} [Hindi-Eng-Jap] 480p, 720p & 1080p HD</div></div>
+      </article>`;
+  }).join('');
+}
 
-  // Convert standard Google Drive file links to direct browser download links
-  const driveMatch = finalUrl.match(/(?:\/d\/|[?&]id=)([a-zA-Z0-9_-]{15,})/);
-  if (driveMatch && driveMatch[1] && !finalUrl.includes('/folders/')) {
-    finalUrl = `https://drive.usercontent.google.com/download?id=${driveMatch[1]}&export=download&confirm=t`;
+// 3. Filters & Search
+function toggleDropdown(id, e) {
+  if (e) e.stopPropagation();
+  const el = document.getElementById(id);
+  const open = el?.classList.contains('open');
+  closeAllDropdowns();
+  if (!open) el?.classList.add('open');
+}
+function closeAllDropdowns() { document.querySelectorAll('.dropdown-panel').forEach(el => el.classList.remove('open')); }
+function toggleAzDrawer() { closeAllDropdowns(); showHomeView(); document.getElementById('az-drawer')?.classList.toggle('open'); }
+
+function showFilterBanner(label) {
+  const b = document.getElementById('filter-banner'), t = document.getElementById('filter-banner-text');
+  if (b && t) { t.innerHTML = `Filter: <strong style="color:#38bdf8;">${label}</strong> (${currentAnimeList.length})`; b.classList.add('active'); }
+}
+
+function resetAllFilters() {
+  selectedLetter = 'ALL';
+  currentAnimeList = getFullAnimeList();
+  document.getElementById('filter-banner')?.classList.remove('active');
+  if (document.getElementById('global-search-input')) document.getElementById('global-search-input').value = '';
+  renderNavigationMenus(); showHomeView(); renderAnimeGrid(currentAnimeList);
+}
+
+function filterByLetter(l) {
+  selectedLetter = l; renderNavigationMenus();
+  if (l === 'ALL') return resetAllFilters();
+  currentAnimeList = getFullAnimeList().filter(a => {
+    const ch = a.title.trim().charAt(0).toUpperCase();
+    return l === '#' ? /^[^A-Z]/.test(ch) : ch === l;
+  });
+  showHomeView(); renderAnimeGrid(currentAnimeList); showFilterBanner(`Letter "${l}"`);
+}
+
+function filterByLanguage(code, label) {
+  closeAllDropdowns();
+  currentAnimeList = code === 'ALL' ? getFullAnimeList() : getFullAnimeList().filter(a => (a.langs || []).includes(code));
+  showHomeView(); renderAnimeGrid(currentAnimeList); showFilterBanner(label);
+}
+
+function filterByQuality(q, label) {
+  closeAllDropdowns();
+  currentAnimeList = q === 'ZIP' ? getFullAnimeList() : getFullAnimeList().filter(a => (a.qualities || []).includes(q));
+  showHomeView(); renderAnimeGrid(currentAnimeList); showFilterBanner(label);
+}
+
+function filterByGenre(genre) {
+  closeAllDropdowns();
+  currentAnimeList = getFullAnimeList().filter(a => (a.genres || []).some(g => g.toLowerCase() === genre.toLowerCase()));
+  if (!currentAnimeList.length) return runGlobalSearch(genre);
+  showHomeView(); renderAnimeGrid(currentAnimeList); showFilterBanner(genre);
+}
+
+function filterByCategoryTag(cat) {
+  if (cat.includes('1080p')) return filterByQuality('1080p', cat);
+  if (cat.includes('720p')) return filterByQuality('720p', cat);
+  if (cat.includes('480p')) return filterByQuality('480p', cat);
+  if (cat.includes('Hindi')) return filterByLanguage('HI', cat);
+  filterByGenre(cat);
+}
+
+async function runGlobalSearch(qOverride) {
+  const q = (qOverride || document.getElementById('global-search-input')?.value || '').trim();
+  if (!q) return resetAllFilters();
+  showHomeView();
+  document.getElementById('anime-grid').innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#38bdf8;">🌍 Searching "${q}"...</div>`;
+  currentAnimeList = await searchGlobalAnimeApi(q);
+  renderAnimeGrid(currentAnimeList);
+  if (currentAnimeList.length) showFilterBanner(`Search: "${q}"`);
+}
+
+// 4. Story & Trailer Page
+function findAnimeById(id) {
+  return getAdminSavedAnime().find(a => Number(a.id) === Number(id)) ||
+         currentAnimeList.find(a => Number(a.id) === Number(id)) ||
+         getFullAnimeList().find(a => Number(a.id) === Number(id)) || currentAnimeList[0];
+}
+
+async function openStoryPage(id) {
+  activeAnimeItem = findAnimeById(id);
+  if (!activeAnimeItem) return;
+  hideAllSubViews();
+  document.getElementById('story-view').classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  const fallback = createSvgPoster(activeAnimeItem.title, '#0284c7', 'AnimeRush');
+  document.getElementById('story-poster').src = (activeAnimeItem.poster?.startsWith('http')) ? activeAnimeItem.poster : fallback;
+  document.getElementById('story-title').textContent = `${activeAnimeItem.title} [Hindi-Eng-Jap] Multi Audio HD`;
+  document.getElementById('story-anilist-ref').textContent = `AniList ID #${activeAnimeItem.id}`;
+  document.getElementById('story-plot').textContent = activeAnimeItem.synopsis || `Watch and download ${activeAnimeItem.title} in HD.`;
+
+  const box = document.getElementById('story-trailer-box');
+  if (box) {
+    box.innerHTML = `<p style="color:#38bdf8;font-size:0.84rem;">🎬 Loading trailer...</p>`;
+    if (!activeAnimeItem.trailerEmbedUrl) {
+      const t = await fetchJikanTrailerForAnime(activeAnimeItem.title);
+      if (t?.embedUrl) activeAnimeItem.trailerEmbedUrl = t.embedUrl;
+    }
+    box.innerHTML = activeAnimeItem.trailerEmbedUrl
+      ? `<div style="position:relative;padding-bottom:56.25%;height:0;border-radius:10px;overflow:hidden;"><iframe src="${activeAnimeItem.trailerEmbedUrl}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" allowfullscreen loading="lazy"></iframe></div>`
+      : `<a href="https://www.youtube.com/results?search_query=${encodeURIComponent(activeAnimeItem.title + ' trailer')}" target="_blank" class="btn-primary" style="background:#dc2626;display:inline-block;">▶️ Watch Trailer on YouTube</a>`;
+  }
+}
+
+// 5. Smart Download Vault (Shows Active vs Not Added Clearly)
+function isValidUrl(u) {
+  return u && String(u).trim() !== '' && !String(u).startsWith('#') && u !== 'https://drive.google.com/' && !String(u).startsWith('localfile://');
+}
+
+function renderBtn(url, label, color) {
+  if (isValidUrl(url)) {
+    return `<button class="dl-btn ${color}" onclick="startDirectDownload('${String(url).replace(/'/g, "\\'")}')">✅ ${label} [ACTIVE]</button>`;
+  }
+  return `<button class="dl-btn" disabled style="background:#1e293b;color:#64748b;border:1px dashed #334155;cursor:not-allowed;opacity:0.55;">🚫 ${label} (Not Added)</button>`;
+}
+
+function openLinksVault() {
+  if (!activeAnimeItem) activeAnimeItem = getFullAnimeList()[0];
+  const saved = getAdminSavedAnime().find(a => Number(a.id) === Number(activeAnimeItem.id));
+  const episodes = saved?.episodes || activeAnimeItem.episodes || [];
+  const zipUrl = saved?.fullZipUrl || activeAnimeItem.fullZipUrl || '';
+
+  hideAllSubViews();
+  document.getElementById('vault-view').classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  document.getElementById('vault-heading').textContent = `${activeAnimeItem.title} – Download`;
+  document.getElementById('vault-submeta').textContent = `By AnimeRush Admin • AniList #${activeAnimeItem.id}`;
+
+  const zipBox = document.getElementById('vault-zip-box');
+  if (zipBox) {
+    zipBox.style.display = isValidUrl(zipUrl) ? 'block' : 'none';
+    zipBox.innerHTML = isValidUrl(zipUrl) ? `
+      <div class="zip-pack-title"><span>📦 FULL SEASON .ZIP BATCH</span><span style="color:#4ade80;">● ACTIVE</span></div>
+      <div class="dl-btn-row">${renderBtn(zipUrl, 'Full Season .ZIP', 'green')}</div>` : '';
   }
 
-  // Open download cleanly on both mobile Chrome and desktop
+  const epList = document.getElementById('vault-episodes-list');
+  if (!episodes.length) {
+    epList.innerHTML = `<div style="padding:28px;text-align:center;border:1px dashed #ef4444;border-radius:10px;"><h3 style="color:#f87171;">⚠️ Episodes Not Uploaded Yet</h3></div>`;
+    return;
+  }
+
+  epList.innerHTML = episodes.map((ep, i) => `
+    <div class="ep-accordion ${i === 0 ? 'open' : ''}">
+      <div class="ep-header" onclick="this.parentElement.classList.toggle('open')">
+        <div><span class="ep-badge">EP ${ep.epNumber}</span> <strong>${ep.title || 'Episode ' + ep.epNumber}</strong></div>
+        <span>▼</span>
+      </div>
+      <div class="ep-body">
+        ${isValidUrl(ep.directFileUrl) ? `<div class="server-group"><div class="server-label" style="color:#4ade80;">📁 PERSONAL / DIRECT FILE ● ACTIVE</div><div class="dl-btn-row">${renderBtn(ep.directFileUrl, ep.directFileName || 'Direct HD Video', 'purple')}</div></div>` : ''}
+        ${renderServerRow('🟢 GOOGLE DRIVE DIRECT', ep.servers?.gdrive)}
+        ${renderServerRow('☁️ HUBCLOUD', ep.servers?.hubcloud)}
+        ${renderServerRow('⚡ GDFLIX / MEGA / OTHER', ep.servers?.gdflix)}
+      </div>
+    </div>`).join('');
+}
+
+function renderServerRow(title, links = {}) {
+  const hasAny = isValidUrl(links?.p480) || isValidUrl(links?.p720) || isValidUrl(links?.p1080);
+  if (!hasAny) {
+    return `<div class="server-group"><div class="server-label">${title} <span style="color:#64748b;">(Offline)</span></div><span style="color:#64748b;font-size:0.78rem;">❌ Link Not Added</span></div>`;
+  }
+  return `
+    <div class="server-group">
+      <div class="server-label">${title} <span style="color:#4ade80;">● ACTIVE</span></div>
+      <div class="dl-btn-row">
+        ${renderBtn(links.p480, '480p', 'red')}
+        ${renderBtn(links.p720, '720p HEVC', 'blue')}
+        ${renderBtn(links.p1080, '1080p FHD', 'green')}
+      </div>
+    </div>`;
+}
+
+// 6. Direct Download Trigger (Fixes Mobile Drive App / Snapseed Hijack)
+function startDirectDownload(url) {
+  let finalUrl = String(url).trim();
+  const driveId = finalUrl.match(/(?:\/d\/|[?&]id=)([A-Za-z0-9_-]{15,})/)?.[1];
+  if (driveId && !finalUrl.includes('/folders/')) {
+    finalUrl = `https://drive.usercontent.google.com/download?id=${driveId}&export=download&confirm=t`;
+  }
   window.open(finalUrl, '_blank', 'noopener,noreferrer');
 }
 
-// 4. Complete Smart Links Vault View
-function openLinksVault(animeId) {
-  closeAllDropdowns();
-  hideAllSubViews();
-
-  const allAnime = typeof getFullAnimeList === 'function' ? getFullAnimeList() : [];
-  const anime =
-    allAnime.find(a => Number(a.id) === Number(animeId)) ||
-    (typeof currentAnimeList !== 'undefined' ? currentAnimeList.find(a => Number(a.id) === Number(animeId)) : null) ||
-    window.lastSelectedAnime;
-
-  const vaultView = document.getElementById('links-vault-view');
-  if (!vaultView) return;
-  vaultView.classList.add('active');
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-
-  const container = document.getElementById('links-vault-content') || vaultView;
-  if (!anime) {
-    container.innerHTML = `<p style="color:#f87171; padding:20px;">Anime not found.</p>`;
-    return;
-  }
-
-  const episodes = Array.isArray(anime.episodes) ? anime.episodes : [];
-  const hasBatchZip = isLinkValid(anime.fullZipUrl);
-  const tgUrl = typeof TELEGRAM_CHANNEL_URL !== 'undefined' && TELEGRAM_CHANNEL_URL ? TELEGRAM_CHANNEL_URL : 'https://t.me/';
-
-  // Top Full Season Batch Box — only displays active buttons for valid links
-  const batchZipSection = hasBatchZip ? `
-    <div style="border:1px dashed #16a34a; background:rgba(22,163,74,0.08); border-radius:12px; padding:16px; margin-bottom:20px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
-        <strong style="color:#4ade80; font-size:0.9rem;">📦 FULL SEASON .ZIP & GOOGLE DRIVE BATCH DOWNLOAD</strong>
-        <span style="color:#4ade80; font-size:0.78rem; font-weight:800;">● ACTIVE</span>
+// 7. Trailers Page
+async function openTrailersPage(q = '') {
+  closeAllDropdowns(); hideAllSubViews();
+  document.getElementById('trailers-view').classList.add('active');
+  const grid = document.getElementById('jikan-trailers-grid');
+  grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#fde047;">🎬 Loading Trailers...</div>`;
+  const list = await fetchJikanTrailersList(q);
+  grid.innerHTML = list.map(item => `
+    <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+      ${item.embedUrl ? `<div style="position:relative;padding-bottom:56.25%;height:0;"><iframe src="${item.embedUrl}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" allowfullscreen loading="lazy"></iframe></div>` : `<img src="${item.poster}" style="width:100%;height:190px;object-fit:cover;"/>`}
+      <div style="padding:12px;">
+        <h3 style="font-size:0.95rem;color:#fff;margin-bottom:8px;">${item.title}</h3>
+        <button class="btn-primary" style="width:100%;background:#16a34a;" onclick="openAnimeFromTrailer(${item.id}, '${item.title.replace(/'/g, "\\'")}', '${item.poster}', '${item.embedUrl}')">📥 Download Page</button>
       </div>
-      <div style="display:flex; flex-wrap:wrap; gap:10px;">
-        ${renderQualityBtn(anime.fullZipUrl, 'Direct Full Season .ZIP', '#15803d')}
-      </div>
-    </div>
-  ` : '';
-
-  // Episode Cards
-  const episodesHtml = episodes.length === 0 ? `
-    <div style="background:var(--bg-input); border:1px solid var(--border); border-radius:12px; padding:28px; text-align:center;">
-      <h3 style="color:#f87171; margin-bottom:8px;">⚠️ No Episodes Uploaded Yet</h3>
-      <p style="color:var(--text-muted); font-size:0.88rem; margin-bottom:16px;">
-        Links for <strong>${anime.title}</strong> are being encoded and will be uploaded soon!
-      </p>
-      <a href="${tgUrl}" target="_blank" class="btn-primary" style="display:inline-block; background:#0284c7; text-decoration:none; padding:10px 18px; border-radius:8px; color:#fff; font-weight:700;">
-        ✈️ Request Anime on Telegram
-      </a>
-    </div>
-  ` : episodes.map(ep => {
-    const gd = ep.servers?.gdrive || {};
-    const hc = ep.servers?.hubcloud || {};
-    const gf = ep.servers?.gdflix || {};
-
-    const hasDirect = isLinkValid(ep.directFileUrl);
-    const hasGdrive = isLinkValid(gd.p480) || isLinkValid(gd.p720) || isLinkValid(gd.p1080);
-    const hasHubcloud = isLinkValid(hc.p480) || isLinkValid(hc.p720) || isLinkValid(hc.p1080);
-    const hasGdflix = isLinkValid(gf.p480) || isLinkValid(gf.p720) || isLinkValid(gf.p1080);
-
-    return `
-      <div style="background:var(--bg-input); border:1px solid var(--border); border-radius:12px; padding:18px; margin-bottom:16px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:12px; margin-bottom:14px; border-bottom:1px solid var(--border);">
-          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-            <span style="background:#1e293b; color:#93c5fd; font-weight:800; font-size:0.78rem; padding:4px 10px; border-radius:6px;">
-              EP ${ep.epNumber}
-            </span>
-            <strong style="color:#fff; font-size:1rem;">${ep.title || `Episode ${ep.epNumber}`}</strong>
-            <span style="background:rgba(22,163,74,0.2); color:#4ade80; font-size:0.72rem; font-weight:700; padding:3px 8px; border-radius:20px; border:1px solid rgba(74,222,128,0.3);">
-              ✅ Available
-            </span>
-          </div>
-        </div>
-
-        <!-- 1. PERSONAL / DIRECT FILE LINK (Only shown if valid link added) -->
-        ${hasDirect ? `
-          <div style="margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--border);">
-            <div style="font-size:0.78rem; font-weight:800; color:#4ade80; margin-bottom:10px;">
-              📁 PERSONAL / DIRECT ANIME FILE DOWNLOAD <span style="color:#86efac;">● ACTIVE</span>
-            </div>
-            <div style="display:flex; flex-wrap:wrap; gap:10px;">
-              ${renderQualityBtn(ep.directFileUrl, `Download Anime File (${ep.directFileName || 'HD Video'})`, '#6d28d9')}
-            </div>
-          </div>
-        ` : ''}
-
-        <!-- 2. GOOGLE DRIVE DIRECT -->
-        <div style="margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--border);">
-          <div style="font-size:0.78rem; font-weight:800; color:#cbd5e1; margin-bottom:10px;">
-            🟢 GOOGLE DRIVE DIRECT
-            ${hasGdrive
-              ? `<span style="color:#4ade80; margin-left:6px;">● ACTIVE</span>`
-              : `<span style="color:#64748b; margin-left:6px;">(Not Added)</span>`}
-          </div>
-          ${hasGdrive ? `
-            <div style="display:flex; flex-wrap:wrap; gap:10px;">
-              ${renderQualityBtn(gd.p480, '480p x264', '#9a3412')}
-              ${renderQualityBtn(gd.p720, '720p HEVC 10bit', '#0369a1')}
-              ${renderQualityBtn(gd.p1080, '1080p Full HD', '#15803d')}
-            </div>
-          ` : `<div style="font-size:0.8rem; color:#64748b; font-style:italic;">❌ Link Not Added for this server</div>`}
-        </div>
-
-        <!-- 3. HUBCLOUD -->
-        <div style="margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--border);">
-          <div style="font-size:0.78rem; font-weight:800; color:#cbd5e1; margin-bottom:10px;">
-            ☁️ HUBCLOUD
-            ${hasHubcloud
-              ? `<span style="color:#4ade80; margin-left:6px;">● ACTIVE</span>`
-              : `<span style="color:#64748b; margin-left:6px;">(Not Added)</span>`}
-          </div>
-          ${hasHubcloud ? `
-            <div style="display:flex; flex-wrap:wrap; gap:10px;">
-              ${renderQualityBtn(hc.p480, '480p x264', '#9a3412')}
-              ${renderQualityBtn(hc.p720, '720p HEVC 10bit', '#0369a1')}
-              ${renderQualityBtn(hc.p1080, '1080p Full HD', '#15803d')}
-            </div>
-          ` : `<div style="font-size:0.8rem; color:#64748b; font-style:italic;">❌ Link Not Added for this server</div>`}
-        </div>
-
-        <!-- 4. GDFLIX / MEGA / OTHER -->
-        <div>
-          <div style="font-size:0.78rem; font-weight:800; color:#cbd5e1; margin-bottom:10px;">
-            ⚡ GDFLIX / MEGA / OTHER
-            ${hasGdflix
-              ? `<span style="color:#4ade80; margin-left:6px;">● ACTIVE</span>`
-              : `<span style="color:#64748b; margin-left:6px;">(Not Added)</span>`}
-          </div>
-          ${hasGdflix ? `
-            <div style="display:flex; flex-wrap:wrap; gap:10px;">
-              ${renderQualityBtn(gf.p480, '480p x264', '#9a3412')}
-              ${renderQualityBtn(gf.p720, '720p HEVC 10bit', '#0369a1')}
-              ${renderQualityBtn(gf.p1080, '1080p Full HD', '#15803d')}
-            </div>
-          ` : `<div style="font-size:0.8rem; color:#64748b; font-style:italic;">❌ Link Not Added for this server</div>`}
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  container.innerHTML = `
-    <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:16px; padding:22px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; flex-wrap:wrap; gap:10px;">
-        <button onclick="openAnimeDetail(${anime.id})" style="background:var(--bg-input); color:#38bdf8; border:1px solid var(--border); padding:8px 14px; border-radius:8px; cursor:pointer; font-weight:600;">
-          ← Back to Story & Trailer
-        </button>
-        <button onclick="goHome()" style="background:var(--bg-input); color:#38bdf8; border:1px solid var(--border); padding:8px 14px; border-radius:8px; cursor:pointer; font-weight:600;">
-          🏠 AnimeRush Home
-        </button>
-      </div>
-
-      <h1 style="font-size:1.55rem; color:#fff; margin-bottom:4px;">${anime.title} – Download</h1>
-      <p style="font-size:0.82rem; color:#38bdf8; margin-bottom:20px;">
-        By AnimeRush Admin • Official AniList #${anime.id}
-      </p>
-
-      ${batchZipSection}
-      ${episodesHtml}
-    </div>
-  `;
+    </div>`).join('');
 }
+
+function searchJikanTrailersPage() { openTrailersPage(document.getElementById('trailer-search-input')?.value.trim()); }
+function openAnimeFromTrailer(id, title, poster, embed) {
+  if (!findAnimeById(id)) currentAnimeList.unshift(formatApiMediaToAnimeRush(id, title, poster, '', ['Action'], embed));
+  openStoryPage(id);
+}
+function hideAllSubViews() {
+  document.getElementById('home-view').style.display = 'none';
+  ['story-view', 'vault-view', 'trailers-view'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+}
+function showHomeView() { hideAllSubViews(); document.getElementById('home-view').style.display = 'grid'; }
+function toggleThemeMode() { document.body.classList.toggle('light-mode'); }
